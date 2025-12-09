@@ -104,28 +104,36 @@
       }
     }
 
-    /* Patlama (pop) animasyonu */
+    /* Patlama (pop) animasyonu – daha gösterişli */
     .cell.pop {
-      animation: pop 0.45s ease-out forwards;
+      animation: pop 0.8s ease-out forwards;
     }
 
     @keyframes pop {
       0% {
         transform: scale(1) translateY(0);
         opacity: 1;
+        box-shadow: 0 0 0 rgba(255,255,255,0);
       }
-      50% {
-        transform: scale(1.25) translateY(-6px);
+      30% {
+        transform: scale(1.3) translateY(-8px);
         opacity: 1;
+        box-shadow: 0 0 16px rgba(255,255,255,0.9);
+      }
+      60% {
+        transform: scale(0.9) translateY(4px);
+        opacity: 0.9;
+        box-shadow: 0 0 10px rgba(255,255,255,0.6);
       }
       100% {
         transform: scale(0.2) translateY(20px);
         opacity: 0;
+        box-shadow: 0 0 0 rgba(255,255,255,0);
       }
     }
 
     .cell.symbol-win {
-      background: #3c2b5a;
+      background: #4b2f76;
       box-shadow: 0 0 10px rgba(255,255,255,0.5);
     }
 
@@ -339,9 +347,9 @@
     let freeSpins = 0;
     let currentSpinIsFree = false;
 
-    let freeSpinSessionActive = false;      // şu anda seri free spin dönüyor mu?
-    let freeSpinSessionTotalWin = 0;       // seri toplam kazanç
-    let freeSpinSessionStartedByBuy = false; // overlay sadece BUY için
+    let freeSpinSessionActive = false;         // seri free spin dönüyor mu?
+    let freeSpinSessionTotalWin = 0;          // seri toplam kazanç
+    let freeSpinSessionStartedByBuy = false;  // overlay sadece BUY için
 
     const elGrid      = document.getElementById("grid");
     const elBalance   = document.getElementById("balance");
@@ -568,7 +576,8 @@
         elInfo.textContent = chainIndex + ". tumble!";
         // Patlama animasyonu ile render
         renderGrid(winnerIds, true);
-        await wait(700); // patlamayı net görebil
+        // Patlamanın TAM bitmesini bekle (0.8s anim + küçük pay)
+        await wait(900);
 
         const removed = removeWinningSymbols(winnerIds);
 
@@ -588,8 +597,8 @@
         spawnMultipliersRandom();
 
         renderGrid();
-        await wait(450); // yeni düşüşü de gör
-
+        // Yeni düşüş animasyonunu da gör
+        await wait(450);
       }
 
       return totalWin;
@@ -636,12 +645,10 @@
         updateUI();
 
         if (freeSpinSessionActive && isFree) {
-          // Free spin serisindeyiz → toplam seriye ekle, bilgiyi yaz
           freeSpinSessionTotalWin += totalWin;
           elWinInfo.innerHTML =
             `<span class="ok">Free Spin kazanç: ${totalWin} | Toplam: ${freeSpinSessionTotalWin}</span>`;
         } else {
-          // Normal spin
           elWinInfo.innerHTML =
             `<span class="ok">Toplam kazanç: ${totalWin} kredi</span>`;
         }
@@ -653,14 +660,13 @@
         }
       }
 
-      // Scatter ile free spin kazanımı (base oyun veya free spin içi)
+      // Scatter ile free spin kazanımı
       if (scatterCount >= 4) {
         const extra = Math.max(0, scatterCount - 4);
         const awardedFS = 10 + extra * 2;
         freeSpins += awardedFS;
 
         if (!freeSpinSessionActive) {
-          // Scatter ile yeni seri başlıyor
           freeSpinSessionActive = true;
           freeSpinSessionTotalWin = 0;
           freeSpinSessionStartedByBuy = false;
@@ -706,11 +712,11 @@
       if (freeSpinSessionActive && freeSpins > 0) {
         setTimeout(() => {
           spin();
-        }, 900); // spinler arası biraz boşluk
+        }, 900); // spinler arası da biraz boşluk
       }
     }
 
-    // BUY free spin: bahis ×100, 10 free spin, overlay ile başlat
+    // BUY free spin: bahis ×100, 10 free spin, overlay ile başlar
     function buyFreeSpins() {
       if (spinning) return;
       const cost = bet * 100;
@@ -732,7 +738,7 @@
       elInfo.textContent = "";
       elWinInfo.textContent = "";
 
-      // Overlay göster, dokununca 10 free spin serisi başlasın
+      // Overlay göster, dokununca seri başlasın
       elOverlayText.textContent = "10 free spin kazandın! Başlatmak için ekrana dokun.";
       elFsOverlay.style.display = "flex";
       elSpin.disabled = true;
