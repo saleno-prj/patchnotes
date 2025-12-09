@@ -288,15 +288,31 @@
       return arr[Math.floor(Math.random() * arr.length)];
     }
 
-    function createRandomCell() {
-      const sym = randChoice(SYMBOLS);
-      return {
-        id: sym.id,
-        emoji: sym.emoji,
-        isMultiplier: false,
-        multValue: 0
-      };
-    }
+function createRandomCell() {
+  // Scatter çıkma ihtimali %4 (0.04)
+  const isScatter = Math.random() < 0.04;
+
+  if (isScatter) {
+    const sym = SYMBOLS.find(s => s.id === "scatter");
+    return {
+      id: sym.id,
+      emoji: sym.emoji,
+      isMultiplier: false,
+      multValue: 0
+    };
+  }
+
+  // Scatter HARİÇ normal semboller
+  const normalSymbols = SYMBOLS.filter(s => s.id !== "scatter");
+  const sym = randChoice(normalSymbols);
+
+  return {
+    id: sym.id,
+    emoji: sym.emoji,
+    isMultiplier: false,
+    multValue: 0
+  };
+}
 
     function initGrid() {
       grid = [];
