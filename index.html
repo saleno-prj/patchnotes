@@ -85,13 +85,12 @@
       position: relative;
       overflow: hidden;
       transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
-      /* animasyon için başlangıç hali */
+      /* yukarıdan kayma animasyonu */
       transform: translateY(-40px);
       opacity: 0;
       animation: drop 0.25s ease-out forwards;
     }
 
-    /* Yukarıdan aşağı kayma animasyonu */
     @keyframes drop {
       from {
         transform: translateY(-40px);
@@ -251,17 +250,11 @@
     </div>
   </div>
 
-  <!-- İstersen buraya kendi ses dosyalarını koy:
-  <audio id="sndSpin" src="spin.mp3" preload="auto"></audio>
-  <audio id="sndWin"  src="win.mp3"  preload="auto"></audio>
-  -->
-
   <script>
     // === OYUN AYARLARI ===
     const ROWS = 5;
     const COLS = 6;
 
-    // Semboller (emoji tabanlı). İstersen bunları PNG'ye çevirebiliriz.
     const SYMBOLS = [
       { id: "apple",   emoji: "🍎" },
       { id: "orange",  emoji: "🍊" },
@@ -274,8 +267,8 @@
     ];
 
     const MULTIPLIER_VALUES = [2, 4, 6, 8, 10, 25];
-    const MULT_CHANCE_BASE = 0.12; // normal spinlerde çarpan
-    const MULT_CHANCE_FREE = 0.20; // free spin sırasında daha yüksek
+    const MULT_CHANCE_BASE = 0.12;
+    const MULT_CHANCE_FREE = 0.20;
 
     // === STATE ===
     let grid = [];
@@ -285,6 +278,10 @@
 
     let freeSpins = 0;
     let currentSpinIsFree = false;
+
+    // Free spin serisi takibi (Sweet Bonanza tarzı)
+    let freeSpinSessionActive = false;
+    let freeSpinSessionTotalWin = 0;
 
     const elGrid      = document.getElementById("grid");
     const elBalance   = document.getElementById("balance");
@@ -297,17 +294,13 @@
     const elBetPlus   = document.getElementById("betPlus");
     const elFreeSpins = document.getElementById("freeSpins");
 
-    // const sndSpin = document.getElementById("sndSpin");
-    // const sndWin  = document.getElementById("sndWin");
-
     function randChoice(arr) {
       return arr[Math.floor(Math.random() * arr.length)];
     }
 
-    // Scatter oranı düşürülmüş versiyon
+    // Scatter oranı daha düşük
     function createRandomCell() {
-      // Scatter çıkma ihtimali %4
-      const isScatter = Math.random() < 0.04;
+      const isScatter = Math.random() < 0.04; // %4 scatter
 
       if (isScatter) {
         const sym = SYMBOLS.find(s => s.id === "scatter");
@@ -319,7 +312,6 @@
         };
       }
 
-      // Scatter hariç normal semboller
       const normalSymbols = SYMBOLS.filter(s => s.id !== "scatter");
       const sym = randChoice(normalSymbols);
 
@@ -350,7 +342,6 @@
           const cellDiv = document.createElement("div");
           cellDiv.className = "cell";
 
-          // Her hücre için küçük bir gecikme (daha tatlı animasyon)
           const index = r * COLS + c;
           cellDiv.style.animationDelay = (index * 0.02) + "s";
 
@@ -359,7 +350,6 @@
             continue;
           }
 
-          // Kazanan semboller için highlight (scatter hariç)
           if (winningIds.includes(cellData.id) &&
               !cellData.isMultiplier &&
               cellData.id !== "scatter") {
@@ -368,7 +358,6 @@
 
           cellDiv.textContent = cellData.emoji;
 
-          // Çarpan varsa köşeye rozet
           if (cellData.isMultiplier && cellData.multValue > 0) {
             const multDiv = document.createElement("div");
             multDiv.className = "cell-mult";
@@ -412,7 +401,6 @@
     }
 
     function findWinningSymbols() {
-      // 8+ aynı sembol (scatter ve multiplier hariç)
       const counts = {};
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
@@ -423,10 +411,7 @@
         }
       }
       const winnerIds = Object.keys(counts).filter(id => counts[id] >= 8);
-      const totalWinningSymbols = winnerIds
-        .reduce((acc, id) => acc + counts[id], 0);
-
-      return { winnerIds, totalWinningSymbols };
+      return { winnerIds };
     }
 
     function removeWinningSymbols(winnerIds) {
@@ -517,9 +502,8 @@
 
         const removed = removeWinningSymbols(winnerIds);
 
-        // Çarpanları uygula
         const multiplierSum = getTotalMultiplier();
-        const basePerSymbol = bet * 0.25; // keyfi oran
+        const basePerSymbol = bet * 0.25;
         let winThisTumble = removed * basePerSymbol;
         if (multiplierSum > 0) {
           winThisTumble *= multiplierSum;
@@ -528,11 +512,9 @@
 
         totalWin += winThisTumble;
 
-        // Kullanılan çarpanları temizle
         clearMultipliers();
 
         dropSymbols();
-        // Yeni düşen sembollere tekrar multiplier at
         spawnMultipliersRandom();
 
         renderGrid();
@@ -546,7 +528,7 @@
       if (spinning) return;
       if (bet <= 0) return;
 
-      let isFree = freeSpins > 0;
+      const isFree = freeSpins > 0 && freeSpinSessionActive;
       currentSpinIsFree = isFree;
 
       if (!isFree && balance < bet) {
@@ -565,7 +547,6 @@
         elInfo.textContent = `FREE SPIN! Kalan: ${freeSpins}`;
       } else {
         elInfo.textContent = "Dönüyor...";
-        // if (sndSpin) { sndSpin.currentTime = 0; sndSpin.play().catch(()=>{}); }
         balance -= bet;
       }
       updateUI();
@@ -583,19 +564,32 @@
       if (totalWin > 0) {
         balance += totalWin;
         updateUI();
-        // if (sndWin) { sndWin.currentTime = 0; sndWin.play().catch(()=>{}); }
 
-        elWinInfo.innerHTML =
-          `<span class="ok">Toplam kazanç: ${totalWin} kredi</span>`;
+        if (freeSpinSessionActive && isFree) {
+          // Free spin serisinde: sadece toplama ekle, spin başına kazancı yazma
+          freeSpinSessionTotalWin += totalWin;
+          elWinInfo.textContent = "";
+        } else {
+          // Normal spin: kazancı direkt göster
+          elWinInfo.innerHTML =
+            `<span class="ok">Toplam kazanç: ${totalWin} kredi</span>`;
+        }
       } else {
-        elWinInfo.textContent = "Bu elde kazanç yok.";
+        if (!freeSpinSessionActive || !isFree) {
+          elWinInfo.textContent = "Bu elde kazanç yok.";
+        }
       }
 
-      // Free Spin kazanımı
+      // Free spin kazanımı (scatter ile)
       if (scatterCount >= 4) {
         const extra = Math.max(0, scatterCount - 4);
         const awardedFS = 10 + extra * 2;
         freeSpins += awardedFS;
+
+        if (!freeSpinSessionActive) {
+          freeSpinSessionActive = true;
+          freeSpinSessionTotalWin = 0;
+        }
         updateUI();
 
         const freeMsg = isFree
@@ -605,18 +599,29 @@
         elWinInfo.innerHTML += `<br><span class="ok">${freeMsg}</span>`;
       }
 
-      if (isFree && freeSpins === 0) {
+      // Free spin serisi bittiyse toplam kazancı yaz
+      if (freeSpinSessionActive && isFree && freeSpins === 0) {
         elInfo.textContent = "Free spinler bitti.";
-      } else if (!isFree) {
+        elWinInfo.innerHTML =
+          `<span class="ok">Free Spin Toplam Kazanç: ${freeSpinSessionTotalWin} kredi</span>`;
+        freeSpinSessionActive = false;
+      } else if (!isFree && !freeSpinSessionActive) {
         elInfo.textContent = "";
       }
 
       spinning = false;
       elSpin.disabled = false;
       updateUI();
+
+      // Free spin serisi devam ediyorsa otomatik sıradaki spini başlat
+      if (freeSpinSessionActive && freeSpins > 0) {
+        setTimeout(() => {
+          spin();
+        }, 600);
+      }
     }
 
-    // Free Spin satın alma: bahis × 100 maliyet, 10 free spin ver, hemen başlat
+    // Free Spin satın alma: bahis ×100 maliyet, 10 free spin, otomatik seri
     function buyFreeSpins() {
       if (spinning) return;
       const cost = bet * 100;
@@ -630,12 +635,14 @@
 
       balance -= cost;
       freeSpins += 10;
+      freeSpinSessionActive = true;
+      freeSpinSessionTotalWin = 0;
       updateUI();
 
       elInfo.textContent = `BUY ile 10 free spin aldın!`;
       elWinInfo.textContent = "";
 
-      spin();
+      spin(); // ilk free spin otomatik başlasın
     }
 
     // Bahis kontrol
